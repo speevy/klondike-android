@@ -23,6 +23,7 @@ import java.lang.IllegalArgumentException
 import java.lang.RuntimeException
 import java.util.*
 import kotlin.collections.HashMap
+import kotlin.concurrent.timerTask
 import kotlin.reflect.KProperty
 
 
@@ -37,7 +38,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun drawStatus() {
         val status = klondike.status
-        doubleClickTiming.clear()
+        clickStatuses.clear()
         cardHolders.clear()
 
         drawDeck(status.deck())
@@ -186,9 +187,10 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
-    private val doubleClickTiming : HashMap<Int /* view id */, Long /* last click time */> = HashMap()
-    private val doubleClickCount : HashMap<Int /* view id */, Int> = HashMap()
     private val cardHolders: HashMap<Int /* view id */, CardHolderAndNumber> = HashMap()
+
+    private data class ClickStatus (val clickTime: Long, var clickCount: Int, var dragCancelled: Boolean)
+    private val clickStatuses : HashMap<Int /* view id */, ClickStatus> = HashMap()
 
     private fun drawCard(
         card: Optional<Card>,
@@ -236,31 +238,43 @@ class MainActivity : AppCompatActivity() {
     private fun onLongClickCard(imageView: ImageView) : (v: View,  motionEvent: MotionEvent)
             -> Boolean {
         return fun  (v: View, motionEvent: MotionEvent) : Boolean {
-            val last = doubleClickTiming[imageView.id]
+            val clickStatus = clickStatuses[imageView.id]
             val currentTimeMillis = System.currentTimeMillis()
             Log.w("CLICK", motionEvent.action.toString())
             return when (motionEvent.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    if (last == null || currentTimeMillis - last > 1000L) {
-                        doubleClickTiming[imageView.id] = currentTimeMillis
-                        doubleClickCount[imageView.id] = 1
+                    if (clickStatus == null || currentTimeMillis - clickStatus.clickTime > 500L) {
+                        clickStatuses[imageView.id] = ClickStatus(currentTimeMillis, 1, false)
                     } else {
-                        doubleClickCount[imageView.id] = doubleClickCount[imageView.id]!! + 1
+                        clickStatus.clickCount++
+                        clickStatus.dragCancelled = true
                     }
-                    v.startDragAndDrop(
-                        ClipData.newPlainText("", imageView.id.toString()),
-                        View.DragShadowBuilder(imageView),
-                        cardHolders[imageView.id],
-                        0
-                    )
+                    val cardHolder = cardHolders[imageView.id];
+                    Timer().schedule(timerTask {
+                        val status = clickStatuses[imageView.id];
+                        if (status != null && !status.dragCancelled) {
+                            Log.w("startDragAndDrop", cardHolder.toString())
+                            v.startDragAndDrop(
+                                ClipData.newPlainText(imageView.id.toString(), imageView.id.toString()),
+                                View.DragShadowBuilder(imageView),
+                                cardHolder,
+                                0
+                            )
+                        }
+                    }, 500L)
                     true
                 }
                 MotionEvent.ACTION_UP -> {
+                    clickStatus?.dragCancelled = true
                     val cardHolder = cardHolders[v.id]
-                    if (doubleClickCount[imageView.id]!! > 1) {
+                    if (clickStatus != null && clickStatus.clickCount > 1) {
                         callKlondike { klondike.toPile(cardHolder?.cardHolder) }
                     }
                     true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    clickStatus?.dragCancelled = true
+                    false
                 }
                 else -> false
             }
@@ -269,10 +283,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun setOnDragListener(imageView: ImageView) {
         imageView.setOnDragListener { v, e ->
+            Log.w("setOnDragListener ${imageView.id}", e.toString())
+            val origin = cardHolders[e.clipDescription?.label?.toString()?.toInt()]
             when (e.action) {
-                DragEvent.ACTION_DRAG_STARTED -> e.localState != null
-                        && e.localState is CardHolderAndNumber
-                        && (e.localState as CardHolderAndNumber).cardHolder != cardHolders[imageView.id]?.cardHolder
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    origin != null
+                    && origin.cardHolder != cardHolders[imageView.id]?.cardHolder
+                }
                 DragEvent.ACTION_DRAG_ENTERED -> {
                     (v as? ImageView)?.setColorFilter(Color.GREEN)
                     v.invalidate()
@@ -287,16 +304,16 @@ class MainActivity : AppCompatActivity() {
                 DragEvent.ACTION_DROP -> {
                     (v as? ImageView)?.clearColorFilter()
                     v.invalidate()
-                    val to = cardHolders[imageView.id] ?: return@setOnDragListener false
-                    val from = e.localState as CardHolderAndNumber
-                    callKlondike {
-                        klondike.moveCards(
-                            from.cardHolder,
-                            to.cardHolder,
-                            from.number
-                        )
+                    if (origin != null) {
+                        val to = cardHolders[imageView.id] ?: return@setOnDragListener false
+                        callKlondike {
+                            klondike.moveCards(
+                                origin.cardHolder,
+                                to.cardHolder,
+                                origin.number
+                            )
+                        }
                     }
-
                     true
                 }
                 else -> false
