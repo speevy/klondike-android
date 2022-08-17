@@ -175,11 +175,11 @@ class MainActivity : AppCompatActivity() {
             action()
             drawStatus()
         } catch (e: IllegalStateException) {
-            showError("Invalid Movement")
+            showError(getString(R.string.messageInvalidMovement))
         } catch (e:IllegalArgumentException) {
-            showError("Illegal Movement")
+            showError(getString(R.string.MessageIllegalMovement))
         } catch (e: RuntimeException) {
-            showError("Unknown error")
+            showError(getString(R.string.MessageUnknownError))
         }
     }
 
