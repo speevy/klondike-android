@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
@@ -36,6 +37,15 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         drawStatus()
+
+        val callback: OnBackPressedCallback = object: OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                klondike.undo()
+                drawStatus()
+            }
+        }
+
+        onBackPressedDispatcher.addCallback(this, callback)
     }
 
     private fun drawStatus() {
