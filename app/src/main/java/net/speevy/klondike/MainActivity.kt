@@ -29,11 +29,16 @@ import kotlin.collections.HashMap
 import kotlin.concurrent.timerTask
 import kotlin.reflect.KProperty
 
+private const val KLONDIKE_STATE_NAME = "KLONDIKE"
 
 class MainActivity : AppCompatActivity() {
     private var klondike = Klondike(AmericanCards())
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val state = savedInstanceState?.getString(KLONDIKE_STATE_NAME)
+        if (state != null) {
+            klondike = jacksonObjectMapper().readValue(state)
+        }
         setContentView(R.layout.activity_main)
 
         drawStatus()
@@ -355,5 +360,10 @@ class MainActivity : AppCompatActivity() {
         } as KProperty<Int>
 
         return cardId.getter.call()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString(KLONDIKE_STATE_NAME,jacksonObjectMapper().writeValueAsString(klondike))
+        super.onSaveInstanceState(outState)
     }
 }
