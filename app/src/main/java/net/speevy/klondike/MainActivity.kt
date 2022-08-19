@@ -1,13 +1,13 @@
 package net.speevy.klondike
 
+import android.app.AlertDialog
+import android.app.Dialog
 import android.content.ClipData
+import android.content.DialogInterface
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
-import android.view.DragEvent
-import android.view.MotionEvent
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -46,6 +46,33 @@ class MainActivity : AppCompatActivity() {
         }
 
         onBackPressedDispatcher.addCallback(this, callback)
+
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        menuInflater.inflate(R.menu.menu_main, menu)
+
+
+        return true
+
+    }
+
+    override fun onOptionsItemSelected (item: MenuItem) : Boolean {
+        return when (item.itemId) {
+            R.id.action_newGame -> {
+                AlertDialog.Builder(this)
+                    .setMessage(getString(R.string.new_game_confirm))
+                    .setPositiveButton(getString(R.string.yes)) { _: DialogInterface, _: Int ->
+                        klondike = Klondike(AmericanCards())
+                        drawStatus()
+                    }
+                    .setNegativeButton(getString(R.string.no), null)
+                    .show()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     private fun drawStatus() {
@@ -213,6 +240,7 @@ class MainActivity : AppCompatActivity() {
         imageView: ImageView,
         cardHolder: CardHolderAndNumber
     ) {
+        val pile = Pile()
         if (card.isPresent) {
             drawCard(card.get(), imageView, cardHolder)
         } else {

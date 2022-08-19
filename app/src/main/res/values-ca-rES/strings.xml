@@ -4,4 +4,7 @@
     <string name="messageInvalidMovement">Moviment invàlid</string>
     <string name="MessageIllegalMovement">Moviment il·legal</string>
     <string name="MessageUnknownError">Error desconegut</string>
+    <string name="yes">Sí</string>
+    <string name="no">No</string>
+    <string name="new_game_confirm">Vols començar una partida nova?</string>
 </resources>
