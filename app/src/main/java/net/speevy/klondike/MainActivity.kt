@@ -392,7 +392,12 @@ class MainActivity : AppCompatActivity() {
                 }
                 DragEvent.ACTION_DRAG_ENTERED -> {
                     if (!isMe) {
-                        (v as? ImageView)?.setColorFilter(Color.argb(128, 128, 255, 128))
+                        val color = if (klondike.canMoveCards(origin.cardHolder, to.cardHolder, origin.number)) {
+                            Color.argb(128, 128, 255, 128)
+                        } else {
+                            Color.argb(128, 255, 128, 128)
+                        }
+                        (v as? ImageView)?.setColorFilter(color)
                         v.invalidate()
                     }
                     true
