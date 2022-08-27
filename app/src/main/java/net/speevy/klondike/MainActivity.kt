@@ -13,6 +13,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
+import androidx.core.view.children
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import speevy.cardGames.AmericanCards
@@ -101,6 +102,8 @@ class MainActivity : AppCompatActivity() {
         var view : ConstraintLayout = findViewById(id)
         val holder = Klondike.CardHolder(Klondike.CardHolderType.FOUNDATION, index)
 
+        view.setOnDragListener (generateDragListenerContainer(holder))
+
         view.removeAllViews()
 
         var i = 0
@@ -117,9 +120,9 @@ class MainActivity : AppCompatActivity() {
         status.visible().forEach { card ->
             imageView = prepareFoundationCard(view, calculateSeparation(i, numHidden))
             view = (imageView?.parent as ConstraintLayout?)!!
-            drawCard(card, imageView!!, view, CardHolderAndNumber(holder, lastCardIndex - i))
-            imageView!!.setOnDragListener(generateDummyDragListener(view,
-                CardHolderAndNumber(holder, lastCardIndex - i)))
+            val cardHolder = CardHolderAndNumber(holder, lastCardIndex - i)
+            drawCard(card, imageView!!, view, cardHolder)
+            imageView!!.setOnDragListener(generateDragListener(view, cardHolder))
             i++
         }
 
@@ -129,7 +132,6 @@ class MainActivity : AppCompatActivity() {
             i++
         }
 
-        imageView!!.setOnDragListener(generateDragListener(imageView!!, CardHolderAndNumber(holder, 1)))
     }
 
     private fun calculateSeparation(i: Int, numHidden: Int): Int {
@@ -204,7 +206,10 @@ class MainActivity : AppCompatActivity() {
         val cardHolder = Klondike.CardHolder(Klondike.CardHolderType.PILE, index)
         drawCard(status.topCard(), pileId, cardHolder)
         val view = findViewById<ImageView>(pileId)
-        view.setOnDragListener(generateDragListener(view, CardHolderAndNumber(cardHolder, 1)))
+        view.setOnDragListener {v: View, e: DragEvent ->
+            generateDragListener(view, CardHolderAndNumber(cardHolder, 1)).invoke(v, e) ||
+            generateDragListenerContainer(cardHolder).invoke(v, e)
+        }
     }
 
     private fun drawDeck(status: Deck.DeckStatus) {
@@ -223,7 +228,7 @@ class MainActivity : AppCompatActivity() {
         val waste: ImageView = findViewById(R.id.DeckWaste)
         val cardHolder = Klondike.CardHolder(Klondike.CardHolderType.DECK)
         drawCard(status.topCardOnWaste(), waste, cardHolder)
-        waste.setOnDragListener(generateDummyDragListener(waste, 
+        waste.setOnDragListener(generateDragListener(waste,
             CardHolderAndNumber(cardHolder, 1)))
     }
 
@@ -316,7 +321,8 @@ class MainActivity : AppCompatActivity() {
 
             return when (motionEvent.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    if (clickStatus == null || currentTimeMillis - clickStatus.clickTime > DOUBLE_CLICK_TIMEOUT) {
+                    if (clickStatus == null ||
+                        currentTimeMillis - clickStatus.clickTime > DOUBLE_CLICK_TIMEOUT) {
                         clickStatuses[view.id] = ClickStatus(currentTimeMillis, 1, false)
                     } else {
                         clickStatus.clickCount++
@@ -353,59 +359,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun generateDummyDragListener(view: View, to: CardHolderAndNumber) :
-            (v: View, e: DragEvent) -> Boolean {
-         return { _, e ->
-             Log.d("DROP", "${e.action} $to $e")
-             val origin = getOrigin(e)
-             if (origin != null && origin == to) {
-                 when (e.action) {
-                     DragEvent.ACTION_DRAG_STARTED -> view.visibility = View.INVISIBLE
-                     DragEvent.ACTION_DRAG_ENDED -> {
-                         Log.d("DRAG_ENDED", "$to ${e.result}")
-                         if (!e.result) {
-                             Log.d("DRAG_ENDED", "setting visible")
-                             view.visibility = View.VISIBLE
-                         }
-                     }
-                     else -> {}
-                 }
-                 true
-             } else {
-                 false
-             }
-         }
-    }
-
-    private fun generateDragListener(view: View, to: CardHolderAndNumber) :
+    private fun generateDragListenerContainer(to: Klondike.CardHolder) :
                 (v: View, e: DragEvent) -> Boolean {
         return lambda@{ v, e ->
-            Log.d("DROP", "${e.action} $to $e")
-            val origin = getOrigin(e) ?: return@lambda false
-            val isMe = origin == to
+            Log.d("DRAG_CONTAINER", "${e.action} $to $e")
+            val from = getFrom(e) ?: return@lambda false
+            val isMe = from.cardHolder == to
             when (e.action) {
-                DragEvent.ACTION_DRAG_STARTED -> {
-                    if (isMe) {
-                        view.visibility = View.INVISIBLE
-                    }
-                    true
-                }
+                DragEvent.ACTION_DRAG_STARTED -> !isMe
                 DragEvent.ACTION_DRAG_ENTERED -> {
                     if (!isMe) {
-                        val color = if (klondike.canMoveCards(origin.cardHolder, to.cardHolder, origin.number)) {
+                        val color = if (klondike.canMoveCards(from.cardHolder, to, from.number)) {
                             Color.argb(128, 128, 255, 128)
                         } else {
                             Color.argb(128, 255, 128, 128)
                         }
-                        (v as? ImageView)?.setColorFilter(color)
+                        applyToAllImages(v) { i -> i.setColorFilter(color) }
                         v.invalidate()
                     }
                     true
                 }
-                DragEvent.ACTION_DRAG_LOCATION -> true
                 DragEvent.ACTION_DRAG_EXITED -> {
                     if (!isMe) {
-                        (v as? ImageView)?.clearColorFilter()
+                        applyToAllImages(v) { i -> i.clearColorFilter() }
                         v.invalidate()
                     }
                     true
@@ -414,12 +390,38 @@ class MainActivity : AppCompatActivity() {
                     if (isMe) {
                         false
                     } else {
-                        (v as? ImageView)?.clearColorFilter()
+                        applyToAllImages(v) {i -> i.clearColorFilter() }
                         v.invalidate()
                         callKlondike {
-                            klondike.moveCards(origin.cardHolder, to.cardHolder, origin.number)
+                            klondike.moveCards(from.cardHolder, to, from.number)
                         }
                     }
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun applyToAllImages(v: View, consumer: (i: ImageView) -> Unit) {
+        when (v) {
+            is ImageView -> consumer.invoke(v)
+            is ViewGroup -> v.children.forEach { x -> applyToAllImages(x, consumer) }
+            else -> {}
+        }
+    }
+
+    private fun generateDragListener(view: View, to: CardHolderAndNumber) :
+                (v: View, e: DragEvent) -> Boolean {
+        return lambda@{ v, e ->
+            Log.d("DRAG", "${e.action} $to $e")
+            val from = getFrom(e) ?: return@lambda false
+            val isMe = from == to
+            when (e.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    if (isMe) {
+                        view.visibility = View.INVISIBLE
+                    }
+                    isMe
                 }
                 DragEvent.ACTION_DRAG_ENDED -> {
                     Log.d("DRAG_ENDED", "$isMe ${e.result}")
@@ -434,16 +436,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getOrigin(e: DragEvent) : CardHolderAndNumber? {
-        var origin = e.localState as? CardHolderAndNumber?
-        if (origin == null) {
+    private fun getFrom(e: DragEvent) : CardHolderAndNumber? {
+        var from = e.localState as? CardHolderAndNumber?
+        if (from == null) {
             try {
-                origin = jacksonObjectMapper().readValue(e.clipDescription.label.toString())
+                from = jacksonObjectMapper().readValue(e.clipDescription.label.toString())
             } catch (e: RuntimeException) {
                 return null
             }
         }
-        return origin
+        return from
     }
 
     private fun getCardImage(card: Card): Int {
