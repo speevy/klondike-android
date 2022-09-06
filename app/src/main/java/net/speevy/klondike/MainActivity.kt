@@ -4,7 +4,9 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.DialogInterface
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
+import android.util.DisplayMetrics
 import android.util.Log
 import android.view.*
 import android.widget.ImageView
@@ -16,6 +18,7 @@ import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.view.children
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import speevy.cardGames.AmericanCardSuit
 import speevy.cardGames.AmericanCards
 import speevy.cardGames.Card
 import speevy.cardGames.klondike.Deck
@@ -30,9 +33,17 @@ import kotlin.reflect.KProperty
 private const val KLONDIKE_STATE_NAME = "KLONDIKE"
 private const val DOUBLE_CLICK_TIMEOUT = 500L
 private const val DRAG_TIMEOUT = 200L
+private const val CARD_SHOW_PERCENT = 0.15F
+private const val CARD_HIDDEN_PERCENT = 0.1F
+private const val CARD_MARGIN = 4
+private const val CARD_ASPECT_RATIO = 60F / 85F
 
 class MainActivity : AppCompatActivity() {
     private var klondike = Klondike(AmericanCards())
+    private var cardWidth = 0
+    private var cardHeight = 0
+    private var density : Float = 0F
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val state = savedInstanceState?.getString(KLONDIKE_STATE_NAME)
@@ -41,6 +52,9 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(R.layout.activity_main)
 
+        calculateCardSize()
+
+        setCOntainerWidth()
         drawStatus()
 
         val callback: OnBackPressedCallback = object: OnBackPressedCallback(true) {
@@ -54,6 +68,55 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    private fun setCOntainerWidth() {
+        val main: ConstraintLayout = findViewById(R.id.main);
+        val totalWidth = (7 * (cardWidth + 2 * CARD_MARGIN * density)).toInt()
+        Log.d("MAIN WIDTH", "$totalWidth")
+
+        var layout = main.layoutParams
+        layout.width = totalWidth
+        main.layoutParams = layout
+
+        val pilesAndDeck : View = findViewById(R.id.pilesAndDeck)
+        layout = pilesAndDeck.layoutParams
+        layout.height = cardHeight + (2 * CARD_MARGIN * density).toInt()
+        pilesAndDeck.layoutParams = layout
+    }
+
+    private fun calculateCardSize() {
+        val main: View = findViewById(R.id.main);
+        Log.d("Main size", "${main.width} x ${main.height}")
+        val width: Int
+        val height: Int
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val metrics = this.windowManager.currentWindowMetrics
+            val insets = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout())
+            width = metrics.bounds.width() - (insets.left + insets.right)
+            height = metrics.bounds.height() - (insets.top + insets.bottom)
+            density = resources.displayMetrics.density
+        } else {
+            val metrics = DisplayMetrics()
+            this.windowManager.defaultDisplay.getMetrics(metrics)
+            width = metrics.widthPixels
+            height = metrics.heightPixels
+            density = metrics.density
+        }
+
+        Log.d("Window size", "$width $height $density")
+
+        // remove 8 times the margin of 4 dp
+        val maxWidth = (width.toFloat() - 14F * CARD_MARGIN * density) / 7F
+        val maxHeight = height.toFloat() / 6F
+
+        Log.d("Max card size", "$maxWidth $maxHeight")
+
+        cardWidth = maxWidth.coerceAtMost(maxHeight * CARD_ASPECT_RATIO).toInt()
+        cardHeight = maxHeight.coerceAtMost(maxWidth / CARD_ASPECT_RATIO).toInt()
+
+        Log.d("Card size", "$cardWidth $cardHeight")
+
+    }
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.menu_main, menu)
@@ -62,6 +125,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected (item: MenuItem) : Boolean {
+        val a: AmericanCardSuit? = null
         return when (item.itemId) {
             R.id.action_newGame -> {
                 AlertDialog.Builder(this)
@@ -136,8 +200,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun calculateSeparation(i: Int, numHidden: Int): Int {
         if (i == 0) return 0
-        if (i <= numHidden) return 16
-        return 40
+        if (i <= numHidden) return (cardHeight * CARD_HIDDEN_PERCENT / 2 * density).toInt()
+        return (cardHeight * CARD_SHOW_PERCENT * density).toInt()
     }
 
     private fun prepareFoundationCard(
@@ -299,17 +363,31 @@ class MainActivity : AppCompatActivity() {
         cardHolder: CardHolderAndNumber
     ) {
         imageView.setImageResource(getCardImage(card))
+        setCardImgSize(imageView)
         draggableView.setOnTouchListener(onLongClickCard(draggableView, cardHolder))
         imageView.visibility = View.VISIBLE
     }
 
+    private fun setCardImgSize(imageView: ImageView) {
+        val layoutParams = imageView.layoutParams
+        Log.d("Layout Params", "${layoutParams.javaClass} -> $layoutParams ${layoutParams.width} ${layoutParams.height}");
+        if (layoutParams is ConstraintLayout.LayoutParams) {
+            layoutParams.width = cardWidth
+            layoutParams.height = cardHeight
+
+            imageView.layoutParams = layoutParams
+        }
+    }
+
     private fun drawEmptyCard(imageView: ImageView) {
         imageView.setImageResource(R.drawable.card_empty)
+        setCardImgSize(imageView)
         imageView.visibility = View.VISIBLE
     }
 
     private fun drawBackCard(imageView: ImageView) {
         imageView.setImageResource(R.drawable.card_back)
+        setCardImgSize(imageView)
         imageView.visibility = View.VISIBLE
     }
 
