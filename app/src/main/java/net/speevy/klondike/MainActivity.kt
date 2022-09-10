@@ -13,12 +13,13 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
+import androidx.constraintlayout.widget.ConstraintSet.*
 import androidx.core.view.children
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import speevy.cardGames.AmericanCardSuit
 import speevy.cardGames.AmericanCards
 import speevy.cardGames.Card
 import speevy.cardGames.klondike.Deck
@@ -33,28 +34,39 @@ import kotlin.reflect.KProperty
 private const val KLONDIKE_STATE_NAME = "KLONDIKE"
 private const val DOUBLE_CLICK_TIMEOUT = 500L
 private const val DRAG_TIMEOUT = 200L
-private const val CARD_SHOW_PERCENT = 0.15F
+private const val CARD_SHOW_PERCENT = 0.22F
 private const val CARD_HIDDEN_PERCENT = 0.1F
 private const val CARD_MARGIN = 4
 private const val CARD_ASPECT_RATIO = 60F / 85F
+private const val PILE_DECK_TO_FOUNDATIONS_GAP = 0.2 // times cardHeight
+private const val APP_MENU_HEIGHT = 48 // dp
+private const val FOUNDATION_HEIGHT_LIMIT= 2.5F // times cardHeight
 
 class MainActivity : AppCompatActivity() {
     private var klondike = Klondike(AmericanCards())
     private var cardWidth = 0
     private var cardHeight = 0
     private var density : Float = 0F
+    private var landscape = false
+    private var width = 0
+    private var height= 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         val state = savedInstanceState?.getString(KLONDIKE_STATE_NAME)
         if (state != null) {
             klondike = jacksonObjectMapper().readValue(state)
         }
-        setContentView(R.layout.activity_main)
 
         calculateCardSize()
 
+        setContentView(if (landscape) R.layout.activity_main_landscape else R.layout.activity_main)
+
         setContainerSize()
+
+        setSupportActionBar(findViewById(R.id.toolbar))
+
         drawStatus()
 
         val callback: OnBackPressedCallback = object: OnBackPressedCallback(true) {
@@ -69,9 +81,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setContainerSize() {
-        val main: ConstraintLayout = findViewById(R.id.main);
-        val totalWidth = (7 * (cardWidth + 2 * CARD_MARGIN * density)).toInt()
+        val main: ConstraintLayout = findViewById(R.id.main)
+        var totalWidth = (7 * (cardWidth + 2 * CARD_MARGIN * density)).toInt()
         Log.d("MAIN WIDTH", "$totalWidth")
+
+        if (landscape) {
+            totalWidth += (APP_MENU_HEIGHT * density).toInt()
+
+            val toolbar: Toolbar = findViewById(R.id.toolbar)
+            val layoutToolbar = toolbar.layoutParams
+            layoutToolbar.width = height
+            toolbar.layoutParams = layoutToolbar
+        }
 
         var layout = main.layoutParams
         layout.width = totalWidth
@@ -79,21 +100,19 @@ class MainActivity : AppCompatActivity() {
 
         val pilesAndDeck : View = findViewById(R.id.pilesAndDeck)
         layout = pilesAndDeck.layoutParams
-        layout.height = (1.2 * cardHeight + 2 * CARD_MARGIN * density).toInt()
+        layout.height = ((1 + PILE_DECK_TO_FOUNDATIONS_GAP) * cardHeight + 2 * CARD_MARGIN * density).toInt()
         pilesAndDeck.layoutParams = layout
     }
 
     private fun calculateCardSize() {
-        val main: View = findViewById(R.id.main);
-        Log.d("Main size", "${main.width} x ${main.height}")
-        val width: Int
-        val height: Int
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+
+       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val metrics = this.windowManager.currentWindowMetrics
-            val insets = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout())
+            val insets = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout() or  WindowInsets.Type.systemBars())
             width = metrics.bounds.width() - (insets.left + insets.right)
             height = metrics.bounds.height() - (insets.top + insets.bottom)
             density = resources.displayMetrics.density
+
         } else {
             val metrics = DisplayMetrics()
             this.windowManager.defaultDisplay.getMetrics(metrics)
@@ -104,11 +123,29 @@ class MainActivity : AppCompatActivity() {
 
         Log.d("Window size", "$width $height $density")
 
-        // remove 14 times (two for each card) the margin
+        // Remove 14 times (two for each card) the margin, and divide by 7 card rows
         val maxWidth = (width.toFloat() - 14F * CARD_MARGIN * density) / 7F
-        val maxHeight = height.toFloat() / 6F
+
+        //  Maximum display height:
+        //      Piles and Deck = (1 + PILE_DECK_TO_FOUNDATIONS_GAP) * cardHeight + 2 * CARD_MARGIN
+        //      Foundations = (6 * CARD_HIDDEN_PERCENT + 13 * CARD_SHOW_PERCENT / 2) * cardHeight +  CARD_MARGIN
+        val maxFoundationHeight = (6 * CARD_HIDDEN_PERCENT + 13 * CARD_SHOW_PERCENT)
+            .coerceAtMost(FOUNDATION_HEIGHT_LIMIT) //Limited for better visibility in most cases
+        val maxHeight = ((height.toFloat() - 3 * CARD_MARGIN * density)
+                / (1 + PILE_DECK_TO_FOUNDATIONS_GAP + maxFoundationHeight)
+            ).toFloat()
 
         Log.d("Max card size", "$maxWidth $maxHeight")
+
+        if (maxWidth > maxHeight * CARD_ASPECT_RATIO) {
+            cardWidth = (maxHeight * CARD_ASPECT_RATIO).toInt()
+            cardHeight = maxHeight.toInt()
+            landscape = true
+        } else {
+            cardWidth = maxWidth.toInt()
+            cardHeight = (maxWidth / CARD_ASPECT_RATIO).toInt()
+            landscape = false // should already be
+        }
 
         cardWidth = maxWidth.coerceAtMost(maxHeight * CARD_ASPECT_RATIO).toInt()
         cardHeight = maxHeight.coerceAtMost(maxWidth / CARD_ASPECT_RATIO).toInt()
@@ -125,7 +162,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected (item: MenuItem) : Boolean {
-        val a: AmericanCardSuit? = null
         return when (item.itemId) {
             R.id.action_newGame -> {
                 AlertDialog.Builder(this)
@@ -171,10 +207,11 @@ class MainActivity : AppCompatActivity() {
         view.removeAllViews()
 
         var i = 0
-        var imageView: ImageView? = null
+        var imageView: ImageView?
         val numHidden = status.numHidden()
+        val numVisible = status.visible().size
         while (i < numHidden) {
-            imageView = prepareFoundationCard(view, calculateSeparation(i, numHidden))
+            imageView = prepareFoundationCard(view, calculateSeparation(i, numHidden, numVisible))
             view = (imageView.parent as ConstraintLayout?)!!
             drawBackCard(imageView)
             i++
@@ -182,7 +219,7 @@ class MainActivity : AppCompatActivity() {
 
         val lastCardIndex = i + status.visible().size
         status.visible().forEach { card ->
-            imageView = prepareFoundationCard(view, calculateSeparation(i, numHidden))
+            imageView = prepareFoundationCard(view, calculateSeparation(i, numHidden, numVisible))
             view = (imageView?.parent as ConstraintLayout?)!!
             val cardHolder = CardHolderAndNumber(holder, lastCardIndex - i)
             drawCard(card, imageView!!, view, cardHolder)
@@ -198,10 +235,16 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun calculateSeparation(i: Int, numHidden: Int): Int {
+    private fun calculateSeparation(i: Int, numHidden: Int, numVisible: Int): Int {
         if (i == 0) return 0
-        if (i <= numHidden) return (cardHeight * CARD_HIDDEN_PERCENT / 2 * density).toInt()
-        return (cardHeight * CARD_SHOW_PERCENT * density).toInt()
+        if (i <= numHidden) return (cardHeight * CARD_HIDDEN_PERCENT).toInt()
+        if (landscape &&
+            numHidden * CARD_HIDDEN_PERCENT + numVisible * CARD_SHOW_PERCENT > FOUNDATION_HEIGHT_LIMIT) {
+
+            return ((FOUNDATION_HEIGHT_LIMIT - numHidden * CARD_HIDDEN_PERCENT - CARD_SHOW_PERCENT) *
+                    cardHeight / (numVisible - 1)).toInt()
+        }
+        return (cardHeight * CARD_SHOW_PERCENT).toInt()
     }
 
     private fun prepareFoundationCard(
@@ -243,16 +286,16 @@ class MainActivity : AppCompatActivity() {
         constraintSet.clone(constraintLayout)
         constraintSet.connect(
             child.id,
-            ConstraintSet.RIGHT,
+            RIGHT,
             parent.id,
-            ConstraintSet.RIGHT,
+            RIGHT,
             0
         )
         constraintSet.connect(
             child.id,
-            ConstraintSet.TOP,
+            TOP,
             parent.id,
-            ConstraintSet.TOP,
+            TOP,
             separation
         )
         constraintSet.applyTo(constraintLayout)
@@ -371,7 +414,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setCardImgSize(imageView: ImageView) {
         val layoutParams = imageView.layoutParams
-        Log.d("Layout Params", "${layoutParams.javaClass} -> $layoutParams ${layoutParams.width} ${layoutParams.height}");
+        Log.d("Layout Params", "${layoutParams.javaClass} -> $layoutParams ${layoutParams.width} ${layoutParams.height}")
         if (layoutParams is ConstraintLayout.LayoutParams) {
             layoutParams.width = cardWidth
             layoutParams.height = cardHeight
@@ -491,7 +534,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun generateDragListener(view: View, to: CardHolderAndNumber) :
                 (v: View, e: DragEvent) -> Boolean {
-        return lambda@{ v, e ->
+        return lambda@{ _, e ->
             Log.d("DRAG", "${e.action} $to $e")
             val from = getFrom(e) ?: return@lambda false
             val isMe = from == to
