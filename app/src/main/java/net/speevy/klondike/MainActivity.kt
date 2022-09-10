@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity() {
 
         calculateCardSize()
 
-        setCOntainerWidth()
+        setContainerSize()
         drawStatus()
 
         val callback: OnBackPressedCallback = object: OnBackPressedCallback(true) {
@@ -68,7 +68,7 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun setCOntainerWidth() {
+    private fun setContainerSize() {
         val main: ConstraintLayout = findViewById(R.id.main);
         val totalWidth = (7 * (cardWidth + 2 * CARD_MARGIN * density)).toInt()
         Log.d("MAIN WIDTH", "$totalWidth")
@@ -79,7 +79,7 @@ class MainActivity : AppCompatActivity() {
 
         val pilesAndDeck : View = findViewById(R.id.pilesAndDeck)
         layout = pilesAndDeck.layoutParams
-        layout.height = cardHeight + (2 * CARD_MARGIN * density).toInt()
+        layout.height = (1.2 * cardHeight + 2 * CARD_MARGIN * density).toInt()
         pilesAndDeck.layoutParams = layout
     }
 
@@ -104,7 +104,7 @@ class MainActivity : AppCompatActivity() {
 
         Log.d("Window size", "$width $height $density")
 
-        // remove 8 times the margin of 4 dp
+        // remove 14 times (two for each card) the margin
         val maxWidth = (width.toFloat() - 14F * CARD_MARGIN * density) / 7F
         val maxHeight = height.toFloat() / 6F
 
@@ -260,20 +260,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun drawPiles(piles: List<Pile.PileStatus>) {
         var i = 0
-        drawPile(i, piles[i++], R.id.Pile1)
-        drawPile(i, piles[i++], R.id.Pile2)
-        drawPile(i, piles[i++], R.id.Pile3)
-        drawPile(i, piles[i++], R.id.Pile4)
+        drawPile(i, piles[i++], R.id.Pile1, R.id.Pile1Container)
+        drawPile(i, piles[i++], R.id.Pile2, R.id.Pile2Container)
+        drawPile(i, piles[i++], R.id.Pile3, R.id.Pile3Container)
+        drawPile(i, piles[i++], R.id.Pile4, R.id.Pile4Container)
     }
 
-    private fun drawPile(index: Int, status: Pile.PileStatus, pileId: Int) {
+    private fun drawPile(index: Int, status: Pile.PileStatus, pileId: Int, containerId: Int) {
         val cardHolder = Klondike.CardHolder(Klondike.CardHolderType.PILE, index)
         drawCard(status.topCard(), pileId, cardHolder)
+        val container = findViewById<ConstraintLayout>(containerId)
+
         val view = findViewById<ImageView>(pileId)
-        view.setOnDragListener {v: View, e: DragEvent ->
-            generateDragListener(view, CardHolderAndNumber(cardHolder, 1)).invoke(v, e) ||
-            generateDragListenerContainer(cardHolder).invoke(v, e)
-        }
+        view.setOnDragListener(generateDragListener(view, CardHolderAndNumber(cardHolder, 1)))
+        container.setOnDragListener(generateDragListenerContainer(cardHolder))
     }
 
     private fun drawDeck(status: Deck.DeckStatus) {
@@ -284,6 +284,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             stock.setImageResource(R.drawable.card_empty)
         }
+        setCardImgSize(stock)
 
         stock.setOnClickListener {
             callKlondike { klondike.take() }
