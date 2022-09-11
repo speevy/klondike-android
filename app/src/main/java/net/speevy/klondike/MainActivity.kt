@@ -81,7 +81,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setContainerSize() {
-        val main: ConstraintLayout = findViewById(R.id.main)
         var totalWidth = (7 * (cardWidth + 2 * CARD_MARGIN * density)).toInt()
         Log.d("MAIN WIDTH", "$totalWidth")
 
@@ -94,9 +93,10 @@ class MainActivity : AppCompatActivity() {
             toolbar.layoutParams = layoutToolbar
         }
 
-        var layout = main.layoutParams
+        val gameZone: View = findViewById(R.id.gameZone)
+        var layout = gameZone.layoutParams
         layout.width = totalWidth
-        main.layoutParams = layout
+        gameZone.layoutParams = layout
 
         val pilesAndDeck : View = findViewById(R.id.pilesAndDeck)
         layout = pilesAndDeck.layoutParams
