@@ -6,10 +6,12 @@ import android.content.DialogInterface
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.text.method.LinkMovementMethod
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.*
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -172,6 +174,23 @@ class MainActivity : AppCompatActivity() {
                     }
                     .setNegativeButton(getString(R.string.no), null)
                     .show()
+                true
+            }
+            R.id.action_undo -> {
+                klondike.undo()
+                drawStatus()
+                true
+            }
+            R.id.action_about -> {
+                val builder = AlertDialog.Builder(this)
+                builder
+                    .setTitle(R.string.app_name)
+                    .setMessage(R.string.about_message)
+                    .setPositiveButton(R.string.ok, DialogInterface.OnClickListener {
+                            dialog, _ ->  dialog.cancel() })
+                    .show()
+                    .findViewById<TextView>(android.R.id.message)
+                    .movementMethod = LinkMovementMethod.getInstance()
                 true
             }
             else -> super.onOptionsItemSelected(item)

@@ -6,4 +6,17 @@
     <string name="new_game_confirm">Do you want to start a new game?</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
+    <string name="undo_movement">Undo</string>
+    <string name="new_game">New game</string>
+    <string name="about">About</string>
+    <string name="ok">OK</string>
+    <string name="about_message">&#169; Ivan Lorca Aragó 2022\n
+        \nOpensource Klondike Solitaire version under Mozilla Public License 2.0\n
+        \nSource code at: <a href="https://github.com/speevy/klondike-android">Github</a>\n
+        \n<b>Credits:</b><ul>
+            \n<li>Card images converted from SVG to PNG using <a href="https://inkscape.org">Inkscape</a>.</li>
+            \n<li>Card symbols, numbers and letters from <a href="https://fonts.google.com/specimen/Archivo+Narrow">Google Fonts - Archivo Narrow</a>.</li>
+            \n<li>App Icons from <a href="https://fonts.google.com/icons">Google Material Icons</a>.</li>
+        </ul>
+    </string>
 </resources>

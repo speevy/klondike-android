@@ -7,4 +7,17 @@
     <string name="yes">Sí</string>
     <string name="no">No</string>
     <string name="new_game_confirm">Vols començar una partida nova?</string>
+    <string name="undo_movement">Desfer</string>
+    <string name="new_game">Partida nova</string>
+    <string name="about">En quant a</string>
+    <string name="ok">D\'acord</string>
+    <string name="about_message">&#169; Ivan Lorca Aragó 2022\n
+        \nVersió del solitari Klondike de codi obert, distribuït sota Mozilla Public License 2.0\n
+        \nCodi font a: <a href="https://github.com/speevy/klondike-android">Github</a>\n
+        \n<b>Credits:</b><ul>
+            \n<li>Imatges de les cartes convertides d\'SVG a PNG amb <a href="https://inkscape.org">Inkscape</a>.</li>
+            \n<li>Símbols, nombres i lletres de les cartes de <a href="https://fonts.google.com/specimen/Archivo+Narrow">Google Fonts - Archivo Narrow</a>.</li>
+            \n<li>Icones de <a href="https://fonts.google.com/icons">Google Material Icons</a>.</li>
+        </ul>
+    </string>
 </resources>
